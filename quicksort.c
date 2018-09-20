@@ -31,7 +31,16 @@ int main(int argc, char** argv) {
     /* TODO: parse arguments with getopt */
 
     /* TODO: start datagen here as a child process. */
-
+    int pid = fork();
+    if (pid < 0) {
+        perror("[quicksort] fork error.");
+    }
+    else if (pid == 0) {
+        if (execv("./datagen", argv) < 0) {
+            perror("[quicksort] execv error.");
+            exit(-1);
+        }
+    }
     /* Create the domain socket to talk to datagen. */
     struct sockaddr_un addr;
     int fd;
@@ -45,10 +54,14 @@ int main(int argc, char** argv) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, DSOCKET_PATH, sizeof(addr.sun_path) - 1);
 
-    if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
+    while (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
         perror("[quicksort] connect error.\n");
         close(fd);
         exit(-1);
+    }
+
+    if ( connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != -1){
+        printf("[quicksort] connected");
     }
 
     /* DEMO: request two sets of unsorted random numbers to datagen */
