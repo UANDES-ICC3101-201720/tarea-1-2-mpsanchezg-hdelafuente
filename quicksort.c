@@ -10,6 +10,12 @@
 #include "types.h"
 #include "const.h"
 #include "util.h"
+#include <ctype.h>
+#include <pthread.h>
+#include <limits.h>
+#include <signal.h>
+
+UINT *readbuf;
 
 // TODO: implement
 int quicksort(UINT* A, int lo, int hi) {
@@ -75,7 +81,7 @@ int main(int argc, char** argv) {
 
     /* TODO: start datagen here as a child process. */
     int pid = fork();
-    
+
     if (pid < 0) {
         perror("[quicksort] fork error.");
     }
@@ -108,10 +114,11 @@ int main(int argc, char** argv) {
         printf("[quicksort] connected");
     }
 
+    char *begin = "BEGIN U ";
+    strcat(begin, char_T_val);
     /* DEMO: request two sets of unsorted random numbers to datagen */
     for (int i = 0; i < 2; i++) {
         /* T value 3 hardcoded just for testing. */
-        char *begin = "BEGIN U 3";
         int rc = strlen(begin);
 
         /* Request the random number stream to datagen */
@@ -140,6 +147,7 @@ int main(int argc, char** argv) {
 
         UINT *readbuf = malloc(sizeof(UINT) * numvalues);
 
+
         while (readvalues < numvalues) {
             /* read the bytestream */
             readbytes = read(fd, readbuf + readvalues, sizeof(UINT) * 1000);
@@ -151,7 +159,6 @@ int main(int argc, char** argv) {
             printf("%u\n", *pv);
         }
 
-        free(readbuf);
     }
 
     /* Issue the END command to datagen */
@@ -165,6 +172,34 @@ int main(int argc, char** argv) {
         }
     }
 
+
+
+    for(int i = 0; i < E_value; i++) {
+        struct timespec start, finish;
+        double elapsed = 0;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        
+        /*aqui va el quicksort*/
+
+        clock_gettime(CLOCK_MONOTONIC, &finish);
+        /* Probe time elapsed. */
+        elapsed = (finish.tv_sec - start.tv_sec);
+        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+
+        struct timespec start_2, finish_2;
+        double elapsed_2 = 0;
+        clock_gettime(CLOCK_MONOTONIC, &start_2);
+        
+        /*aqui va quicksort*/
+
+        clock_gettime(CLOCK_MONOTONIC, &finish_2);
+        elapsed_2 = (finish_2.tv_sec - start_2.tv_sec);
+        elapsed_2 += (finish_2.tv_sec - start_2.tv_sec) / 1000000000.0;
+
+        printf("%d,%d,%lf,%lf\n", E_value, T_value, elapsed_2, elapsed);
+    }
+    free(readbuf);
     close(fd);
     exit(0);
 }
