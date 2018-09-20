@@ -14,4 +14,3 @@ util.o:
 
 clean:
 	rm datagen quicksort *.o
- 

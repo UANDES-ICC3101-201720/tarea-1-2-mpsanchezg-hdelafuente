@@ -29,9 +29,53 @@ int main(int argc, char** argv) {
            sysconf(_SC_NPROCESSORS_ONLN));
 
     /* TODO: parse arguments with getopt */
+    int E_value;
+    int T_value;
+
+    int index;
+    int c;
+
+    opterr = 0;
+    char  char_T_val[2] = "";
+    if (argc == 1) {
+        fprintf(stderr, "[quicksort] No arguments where given\n");
+        exit(-2);
+    }
+
+    while( (c = getopt(argc, argv, "E:T:P:")) != -1) {
+        switch(c) {
+            case 'E':
+                E_value = atoi(optarg);
+                break;
+            case 'T':
+                strcpy(char_T_val, optarg);
+                T_value = atoi(optarg);
+                break;
+            case '?':
+                if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+                return 1;
+            default: 
+                abort();
+        }
+
+    }
+
+    if (E_value < 1) {
+        fprintf(stderr, "[quicksort] Invalid value for E flag\n");
+    }
+    else if (T_value < 3 || T_value > 9) {
+        fprintf(stderr, "[quicksort] Invalid value for T flag\n");
+    }
+
+    for (index = optind; index < argc; index++)
+        printf ("[quicksort] Non-option argument %s\n", argv[index]);
 
     /* TODO: start datagen here as a child process. */
     int pid = fork();
+    
     if (pid < 0) {
         perror("[quicksort] fork error.");
     }
