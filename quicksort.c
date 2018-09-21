@@ -17,8 +17,15 @@
 
 UINT *readbuf;
 
+void swap(UINT *A, int a, int b) {
+    UINT tmp;
+    tmp = A[a]; 
+    A[a] = A[b]; 
+    A[b] = tmp;
+}
+
 int partition (UINT* A, int lo, int hi){
-    int pivot = arr[hi]; // pivot
+    int pivot = A[hi]; // pivot
     int i = (lo - 1);     // Index of smaller element
     
     for (int j = lo; j <= hi-1; j++){
@@ -27,10 +34,10 @@ int partition (UINT* A, int lo, int hi){
         // equal to pivot
         if (A[j] <= pivot){
             i++;
-            swap(&A[i], &A[j]);
+            swap(A, i, j);
         }
     }
-    swap(&A[i + 1], &A[hi]);
+    swap(A, i + 1, hi);
     return (i + 1);
 }
 
@@ -59,10 +66,10 @@ typedef struct {
 int parallel_quicksort(UINT* A, int lo, int hi) {
     // se def num de threads p 
     int n_threads = sysconf(_SC_NPROCESSORS_ONLN);
-    pthread_t threads[nThreads];
+    pthread_t threads[n_threads];
 
     // largo de cada particion
-    int size_of_partitions = sizeof(A)/p;
+    int size_of_partitions = sizeof(A)/n_threads;
     
     int count = 1;
     for (int i = 0; i < n_threads; i++){
@@ -84,7 +91,7 @@ int parallel_quicksort(UINT* A, int lo, int hi) {
     // y lo comunica a todos los demas threads
 
     // Cada proceso P_i mueve los valores en su bloque A_i
-    // de manea q en la mitad izq quedan los valrs menores del
+    // de manera q en la mitad izq quedan los valrs menores del
     // pivote (sub-bloque S_i), y en el lado der los val may a 
     // (sub-bloque  L_i). Esto es similar a lo que hace el
     // procedimiento partition dentro de su ciclo en el alg quicksort serial.
