@@ -13,111 +13,92 @@
 #include <ctype.h>
 #include <pthread.h>
 #include <limits.h>
+#include "omp.h"
 #include <signal.h>
-
 UINT *readbuf;
+//UINT *readbuf_copy;
+int MAXTHREADS;
 
-void swap(UINT *A, int a, int b) {
-    UINT tmp;
-    tmp = A[a]; 
-    A[a] = A[b]; 
-    A[b] = tmp;
-}
+// TODO: implement
+void quicksort (UINT* arr, int left, int right) {
+    int i = left, j = right;
+    int tmp;
+    int pivot = arr[(left + right) / 2];
 
-int partition (UINT* A, int lo, int hi){
-    int pivot = A[hi]; // pivot
-    int i = (lo - 1);     // Index of smaller element
-    
-    for (int j = lo; j <= hi-1; j++){
-        
-        // If current element is smaller than or
-        // equal to pivot
-        if (A[j] <= pivot){
+    while (i <= j) {
+        while (arr[i] < pivot)
             i++;
-            swap(A, i, j);
+        while (arr[j] > pivot)
+            j--;
+        if (i <= j) {
+            tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i++;
+            j--;
         }
     }
-    swap(A, i + 1, hi);
-    return (i + 1);
-}
-
-// TODO: implement
-int quicksort (UINT* A, int lo, int hi) {
-    if (lo < hi){
-        /* pi es partitioning index, arr[p] is now
-           at right place */
-        int pi = partition(A, lo, hi);
-        
-        // Separately sort elements before
-        // partition and after partition
-        quicksort(A, lo, pi - 1);
-        quicksort(A, pi + 1, hi);
+    if (left < j) { 
+        quicksort(arr, left, j);  
     }
-    return 0;
+    if (i < right) { 
+        quicksort(arr, i, right); 
+    }
 }
 
-// TODO: implement
-typedef struct {
-    unsigned int *array;
-    int low;
-    int high;
-} arguments;
 
-int parallel_quicksort(UINT* A, int lo, int hi) {
-    // se def num de threads p 
-    int n_threads = sysconf(_SC_NPROCESSORS_ONLN);
-    pthread_t threads[n_threads];
-
-    // largo de cada particion
-    int size_of_partitions = sizeof(A)/n_threads;
-    
-    int count = 1;
-    for (int i = 0; i < n_threads; i++){
-        arguments *information = malloc(sizeof(arguments));
-        information->array = A;
-        information->low = lo;
-        information->high = (size_of_partitions * count) - 1;
-        /*
-        if (pthread_create(&threads[i], NULL, (void *)quicksort, information)){
-            free(information);
-        }*/
-        lo = size_of_partitions * count;
-        count ++;
+void quickSort_parallel_internal(UINT* array, int left, int right, int cutoff) 
+{   
+    int i = left, j = right;
+    int tmp;
+    int pivot = array[(left + right) / 2];    
+    {
+        /* PARTITION PART */
+        while (i <= j) {
+            while (array[i] < pivot)
+                i++;
+            while (array[j] > pivot)
+                j--;
+            if (i <= j) {
+                tmp = array[i];
+                array[i] = array[j];
+                array[j] = tmp;
+                i++;
+                j--;
+            }
+        }
 
     }
-    // A_i subarreglo o bloque asignado al proceso P_i
-    
-    // Un thread elige un valor pivote aleatorio dentro de A
-    // y lo comunica a todos los demas threads
+    if ( ((right-left)<cutoff) ) {
+        if (left < j) { 
+            quickSort_parallel_internal(array, left, j, cutoff); 
+        }           
+        if (i < right) { 
+            quickSort_parallel_internal(array, i, right, cutoff); 
+        }
+    }
+    else{
+        #pragma omp task 
+        { quickSort_parallel_internal(array, left, j, cutoff); }
+        #pragma omp task 
+        { quickSort_parallel_internal(array, i, right, cutoff); }       
+    }
 
-    // Cada proceso P_i mueve los valores en su bloque A_i
-    // de manera q en la mitad izq quedan los valrs menores del
-    // pivote (sub-bloque S_i), y en el lado der los val may a 
-    // (sub-bloque  L_i). Esto es similar a lo que hace el
-    // procedimiento partition dentro de su ciclo en el alg quicksort serial.
-
-    // Se hace reordenamiento global de los ítems del arreglo A
-    // creando un arreglo A', en donde se copian los elementos
-    // en orden descrito (ver fig 9.19 en libro)
-
-    // El arreglo A' tiene dos secciones; una que contiene los valores
-    // al pivote, S,  otra seccion contigua a la der que contiene los
-    // valores mayores, L.
-
-    // El algoritmo se repite recursivamente, asignando los primeros 
-    // [|S|p/n+0,5] threads a  la seccion S los threads restantes a la 
-    // seccion L.
-
-    // La recursión termina cuando un sub-bloque de A con todos los valores
-    // mayores (o menores) al pivote asignado a un proceso. En este caso, 
-    // el proceso ejecuta la versión serial del algoritmo Quicksort sobre
-    // el  bloque que recibe.
-
-
-    return 0;
 }
 
+void quickSort_parallel(UINT* array, int lenArray, int numThreads){
+    int cutoff = 1000;
+    #pragma omp parallel num_threads(numThreads)
+    {   
+        #pragma omp single nowait
+        {
+            quickSort_parallel_internal(array, 0, lenArray-1, cutoff);  
+        }
+    }   
+
+}
 int main(int argc, char** argv) {
+    MAXTHREADS = sysconf(_SC_NPROCESSORS_ONLN);
     printf("[quicksort] Starting up...\n");
 
     /* Get the number of CPU cores available */
@@ -125,14 +106,14 @@ int main(int argc, char** argv) {
            sysconf(_SC_NPROCESSORS_ONLN));
 
     /* TODO: parse arguments with getopt */
-    int E_value;
-    int T_value;
+    int E_value = 1;
+    int T_value = 3;
 
     int index;
     int c;
 
     opterr = 0;
-    char  char_T_val[2] = "";
+    char char_T_val[2] = "";
     if (argc == 1) {
         fprintf(stderr, "[quicksort] No arguments where given\n");
         exit(-2);
@@ -204,14 +185,13 @@ int main(int argc, char** argv) {
         printf("[quicksort] connected");
     }
 
-    char *begin = "BEGIN U ";
+
+    char begin[] = "BEGIN U ";
     strcat(begin, char_T_val);
     /* DEMO: request two sets of unsorted random numbers to datagen */
     for (int i = 0; i < 2; i++) {
-        /* T value 3 hardcoded just for testing. */
         int rc = strlen(begin);
 
-        /* Request the random number stream to datagen */
         if (write(fd, begin, strlen(begin)) != rc) {
             if (rc > 0) fprintf(stderr, "[quicksort] partial write.\n");
             else {
@@ -222,7 +202,8 @@ int main(int argc, char** argv) {
 
         /* validate the response */
         char respbuf[10];
-        read(fd, respbuf, strlen(DATAGEN_OK_RESPONSE));
+        
+        //read(fd, respbuf, strlen(DATAGEN_OK_RESPONSE));
         respbuf[strlen(DATAGEN_OK_RESPONSE)] = '\0';
 
         if (strcmp(respbuf, DATAGEN_OK_RESPONSE)) {
@@ -236,6 +217,7 @@ int main(int argc, char** argv) {
         size_t readbytes = 0;
 
         UINT *readbuf = malloc(sizeof(UINT) * numvalues);
+        //UINT *readbuf_copy = malloc(sizeof(UINT) * numvalues);
 
 
         while (readvalues < numvalues) {
@@ -268,8 +250,7 @@ int main(int argc, char** argv) {
         struct timespec start, finish;
         double elapsed = 0;
         clock_gettime(CLOCK_MONOTONIC, &start);
-        
-        /*aqui va el quicksort*/
+        quicksort(readbuf, 0, pow(10, T_value) - 1);
 
         clock_gettime(CLOCK_MONOTONIC, &finish);
         /* Probe time elapsed. */
@@ -281,15 +262,15 @@ int main(int argc, char** argv) {
         double elapsed_2 = 0;
         clock_gettime(CLOCK_MONOTONIC, &start_2);
         
-        /*aqui va quicksort*/
+        quickSort_parallel(readbuf, pow(10, T_value), MAXTHREADS);
 
         clock_gettime(CLOCK_MONOTONIC, &finish_2);
         elapsed_2 = (finish_2.tv_sec - start_2.tv_sec);
         elapsed_2 += (finish_2.tv_sec - start_2.tv_sec) / 1000000000.0;
-
-        printf("%d,%d,%lf,%lf\n", E_value, T_value, elapsed_2, elapsed);
     }
+    printf("[quicksort] finished\n");
     free(readbuf);
+    //free(readbuf_copy);
     close(fd);
     exit(0);
 }
