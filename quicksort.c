@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <assert.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -15,109 +16,107 @@
 #include <limits.h>
 #include <signal.h>
 
-UINT *readbuf;
+UINT *nums;
+UINT *nums_copy;
+int MAXTHREADS;
+int n;
 
-void swap(UINT *A, int a, int b) {
+void SWAP(UINT *A, int a, int b) {
     UINT tmp;
     tmp = A[a]; 
     A[a] = A[b]; 
     A[b] = tmp;
 }
 
-int partition (UINT* A, int lo, int hi){
-    int pivot = A[hi]; // pivot
-    int i = (lo - 1);     // Index of smaller element
-    
-    for (int j = lo; j <= hi-1; j++){
-        
-        // If current element is smaller than or
-        // equal to pivot
-        if (A[j] <= pivot){
-            i++;
-            swap(A, i, j);
+int partition(UINT *arr, int l, int h, int pivot)
+{
+    int pivotValue = arr[pivot];
+    SWAP(arr, pivot, h);
+    int storeIndex = l;
+    for (int i=l ; i<h ; i++)
+    {
+        if (arr[i] <= pivotValue)
+        {
+            SWAP(arr, i, storeIndex);
+            storeIndex++;
         }
     }
-    swap(A, i + 1, hi);
-    return (i + 1);
+    SWAP(arr, storeIndex, h);
+    return storeIndex;
 }
 
 // TODO: implement
-int quicksort (UINT* A, int lo, int hi) {
-    if (lo < hi){
-        /* pi es partitioning index, arr[p] is now
-           at right place */
-        int pi = partition(A, lo, hi);
+void quicksort (UINT* arr, int lo, int hi) {
+    int i = lo, j = hi;
+    int tmp;
+    int pivot = arr[(lo + hi) / 2];
+    while (i <= j) {
+        while (arr[i] < pivot)
+            i++;
         
-        // Separately sort elements before
-        // partition and after partition
-        quicksort(A, lo, pi - 1);
-        quicksort(A, pi + 1, hi);
+        while (arr[j] > pivot)
+            j--;
+        
+        if (i <= j) {
+            tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i++;
+            j--;
+        }
     }
-    return 0;
+    if (lo < j){ quicksort(arr, lo, j);  }
+    
+    if (i< hi){ quicksort(arr, i, hi); }
 }
 
 // TODO: implement
-typedef struct {
-    unsigned int *array;
-    int low;
-    int high;
-} arguments;
+struct args {
+    UINT *arr;
+    int l;
+    int h;
+    int threads;
+};
 
-int parallel_quicksort(UINT* A, int lo, int hi) {
-    // se def num de threads p 
-    int n_threads = sysconf(_SC_NPROCESSORS_ONLN);
-    pthread_t threads[n_threads];
+void parallel_quicksort(UINT *arr, int l, int h, int threads);
 
-    // largo de cada particion
-    int size_of_partitions = sizeof(A)/n_threads;
-    
-    int count = 1;
-    for (int i = 0; i < n_threads; i++){
-        arguments *information = malloc(sizeof(arguments));
-        information->array = A;
-        information->low = lo;
-        information->high = (size_of_partitions * count) - 1;
-        /*
-        if (pthread_create(&threads[i], NULL, (void *)quicksort, information)){
-            free(information);
-        }*/
-        lo = size_of_partitions * count;
-        count ++;
+void* p_quicksort(void *arg) {
+    struct args *info = arg;
+    parallel_quicksort(info->arr, info->l, info->h, info->threads);
+    return NULL;
+}
 
+void parallel_quicksort(UINT *arr, int l, int h, int threads) {
+    if (h > l) {
+        int pIndex = l + (h - l)/2;
+        pIndex = partition(arr, l, h, pIndex);
+
+        if (threads-- > 0) {
+            struct args arg = {arr, l, pIndex-1, threads};
+            pthread_t thread;
+            int ret = pthread_create(&thread, NULL, p_quicksort, &arg);
+            assert((ret == 0) && "Thread creation failed");
+            parallel_quicksort(arr, pIndex+1, h, threads);
+            pthread_join(thread, NULL);
+        }
+
+        else {
+            quicksort(arr, l, pIndex-1);
+            quicksort(arr, pIndex+1, h);
+        }
     }
-    // A_i subarreglo o bloque asignado al proceso P_i
-    
-    // Un thread elige un valor pivote aleatorio dentro de A
-    // y lo comunica a todos los demas threads
+}
 
-    // Cada proceso P_i mueve los valores en su bloque A_i
-    // de manera q en la mitad izq quedan los valrs menores del
-    // pivote (sub-bloque S_i), y en el lado der los val may a 
-    // (sub-bloque  L_i). Esto es similar a lo que hace el
-    // procedimiento partition dentro de su ciclo en el alg quicksort serial.
-
-    // Se hace reordenamiento global de los ítems del arreglo A
-    // creando un arreglo A', en donde se copian los elementos
-    // en orden descrito (ver fig 9.19 en libro)
-
-    // El arreglo A' tiene dos secciones; una que contiene los valores
-    // al pivote, S,  otra seccion contigua a la der que contiene los
-    // valores mayores, L.
-
-    // El algoritmo se repite recursivamente, asignando los primeros 
-    // [|S|p/n+0,5] threads a  la seccion S los threads restantes a la 
-    // seccion L.
-
-    // La recursión termina cuando un sub-bloque de A con todos los valores
-    // mayores (o menores) al pivote asignado a un proceso. En este caso, 
-    // el proceso ejecuta la versión serial del algoritmo Quicksort sobre
-    // el  bloque que recibe.
-
-
-    return 0;
+void print_array(UINT *arr, int size) {
+    for (int i = 0; i < size; ++i)
+    {
+        printf(" %d,", arr[i]);
+    }
+    printf("\n\n");
 }
 
 int main(int argc, char** argv) {
+    MAXTHREADS = sysconf(_SC_NPROCESSORS_ONLN);
     printf("[quicksort] Starting up...\n");
 
     /* Get the number of CPU cores available */
@@ -125,14 +124,14 @@ int main(int argc, char** argv) {
            sysconf(_SC_NPROCESSORS_ONLN));
 
     /* TODO: parse arguments with getopt */
-    int E_value;
-    int T_value;
+    int E_value = 1;
+    int T_value = 3;
 
     int index;
     int c;
 
     opterr = 0;
-    char  char_T_val[2] = "";
+    char char_T_val[2] = "";
     if (argc == 1) {
         fprintf(stderr, "[quicksort] No arguments where given\n");
         exit(-2);
@@ -167,7 +166,7 @@ int main(int argc, char** argv) {
     }
 
     for (index = optind; index < argc; index++)
-        printf ("[quicksort] Non-option argument %s\n", argv[index]);
+        fprintf (stderr, "[quicksort] Non-option argument %s\n", argv[index]);
 
     /* TODO: start datagen here as a child process. */
     int pid = fork();
@@ -181,115 +180,102 @@ int main(int argc, char** argv) {
             exit(-1);
         }
     }
-    /* Create the domain socket to talk to datagen. */
-    struct sockaddr_un addr;
-    int fd;
 
-    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        perror("[quicksort] Socket error.\n");
-        exit(-1);
-    }
 
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, DSOCKET_PATH, sizeof(addr.sun_path) - 1);
+    /*======================SOCKET============================*/
+    for(int i = 0; i < E_value; i++) {
+        struct sockaddr_un addr;
+        int fd;
+        n = pow(10, T_value); /*Amount of values in the array */
 
-    while (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
-        perror("[quicksort] connect error.\n");
-        close(fd);
-        exit(-1);
-    }
-
-    if ( connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != -1){
-        printf("[quicksort] connected");
-    }
-
-    char *begin = "BEGIN U ";
-    strcat(begin, char_T_val);
-    /* DEMO: request two sets of unsorted random numbers to datagen */
-    for (int i = 0; i < 2; i++) {
-        /* T value 3 hardcoded just for testing. */
-        int rc = strlen(begin);
-
-        /* Request the random number stream to datagen */
-        if (write(fd, begin, strlen(begin)) != rc) {
-            if (rc > 0) fprintf(stderr, "[quicksort] partial write.\n");
-            else {
-                perror("[quicksort] write error.\n");
-                exit(-1);
-            }
-        }
-
-        /* validate the response */
-        char respbuf[10];
-        read(fd, respbuf, strlen(DATAGEN_OK_RESPONSE));
-        respbuf[strlen(DATAGEN_OK_RESPONSE)] = '\0';
-
-        if (strcmp(respbuf, DATAGEN_OK_RESPONSE)) {
-            perror("[quicksort] Response from datagen failed.\n");
+        if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1 ){
+            perror("[quicksort] socket error");
             close(fd);
             exit(-1);
         }
 
-        UINT readvalues = 0;
-        size_t numvalues = pow(10, 3);
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+
+
+        strcpy(addr.sun_path, "/tmp/dg.sock");
+
+        while ( connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1){
+            perror("[quicksort] connect error");
+        }
+
+        if ( connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != -1){
+            printf("[quicksort] connected");
+        }
+
+        // begin
+        char starting_instruction[] = "BEGIN U ";
+        strcat(starting_instruction, char_T_val); //instruccion completa de inicio
+        if (write(fd, starting_instruction, sizeof(starting_instruction)) == -1) {
+            perror("[quicksort] Error giving starting_instruction.");
+            close(fd);
+            exit(-1);
+        }
+        // leo lo que me entrega el servidor
+        long unsigned int readvalues = 0;
+        size_t numvalues = pow(10, T_value);
         size_t readbytes = 0;
 
-        UINT *readbuf = malloc(sizeof(UINT) * numvalues);
-
-
-        while (readvalues < numvalues) {
-            /* read the bytestream */
-            readbytes = read(fd, readbuf + readvalues, sizeof(UINT) * 1000);
+        UINT *nums = malloc(sizeof(UINT) * numvalues);
+        UINT *nums_copy = malloc(sizeof(UINT) * numvalues);
+        while(readvalues < numvalues) {
+            readbytes = read(fd, nums + readvalues, sizeof(UINT)*1000);
             readvalues += readbytes / 4;
         }
 
-        /* Print out the values obtained from datagen */
-        for (UINT *pv = readbuf; pv < readbuf + numvalues; pv++) {
-            printf("%u\n", *pv);
-        }
-
-    }
-
-    /* Issue the END command to datagen */
-    int rc = strlen(DATAGEN_END_CMD);
-    if (write(fd, DATAGEN_END_CMD, strlen(DATAGEN_END_CMD)) != rc) {
-        if (rc > 0) fprintf(stderr, "[quicksort] partial write.\n");
-        else {
-            perror("[quicksort] write error.\n");
+        if(write(fd, DATAGEN_END_CMD, sizeof(DATAGEN_END_CMD)) == -1){
+            // AQUI DEBERIA TERMINAR EL PROCESO DEL DATAGEN Y SEGUIR CON LO DEL OUTPUT...
+            perror("[quicksort] Error terminating datagen.");
             close(fd);
             exit(-1);
         }
-    }
 
-
-
-    for(int i = 0; i < E_value; i++) {
+        for (int i = 0; i < n; ++i)
+        {
+            nums_copy[i] = nums[i];
+        }
+        
+        //printf("E1: ");
+        //print_array(nums, n);
+        
         struct timespec start, finish;
         double elapsed = 0;
         clock_gettime(CLOCK_MONOTONIC, &start);
         
-        /*aqui va el quicksort*/
+        quicksort(nums, 0, n-1);
 
         clock_gettime(CLOCK_MONOTONIC, &finish);
-        /* Probe time elapsed. */
+
         elapsed = (finish.tv_sec - start.tv_sec);
         elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 
+        //printf("\nS1: ");
+        //print_array(nums, n);
 
         struct timespec start_2, finish_2;
         double elapsed_2 = 0;
         clock_gettime(CLOCK_MONOTONIC, &start_2);
         
-        /*aqui va quicksort*/
+        parallel_quicksort(nums_copy, 0, n - 1, MAXTHREADS);
+
 
         clock_gettime(CLOCK_MONOTONIC, &finish_2);
         elapsed_2 = (finish_2.tv_sec - start_2.tv_sec);
         elapsed_2 += (finish_2.tv_sec - start_2.tv_sec) / 1000000000.0;
-
-        printf("%d,%d,%lf,%lf\n", E_value, T_value, elapsed_2, elapsed);
+        
+        printf("\nS2: ");
+        print_array(nums_copy, n);
+        
+        printf("\n\nquicksort:  %lf [s]\n", elapsed);
+        printf("parallel_quicksort:  %lf [s]\n", elapsed_2);
     }
-    free(readbuf);
-    close(fd);
+
+    free(nums_copy);
+    free(nums);
     exit(0);
 }

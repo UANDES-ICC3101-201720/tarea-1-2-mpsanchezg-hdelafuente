@@ -7,7 +7,7 @@ datagen: datagen.c
 	$(CC) -o datagen datagen.c $(CFLAGS) -lm
 
 quicksort: quicksort.c util.o
-	$(CC) -o quicksort quicksort.c util.o $(CFLAGS) -lm -lpthread -O3 -fopenmp
+	$(CC) -o quicksort quicksort.c util.o $(CFLAGS) -lm -lpthread
 
 util.o:
 	$(CC) -c -o util.o util.c $(CFLAGS)
