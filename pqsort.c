@@ -60,28 +60,46 @@ typedef struct {
     int low;
     int high;
     int pivot;
+    int n_less_than_pivot;
+    int n_thread;
 } arguments;
 
 // *parallel_partition(UINT *A, int lo , int hi, pthread_t threads, int pivot)
 void* parallel_partition(void *args){
     arguments *information = args;
-    int lo, hi, piv;
+    int lo, hi, piv, nums_less_than_pivot, thr;
     UINT *A;
 
-    lo  =   information->low;
-    hi  =  information->high;
-    piv = information->pivot;
-    A   = information->array;
+    lo  =      information->low;
+    hi  =     information->high;
+    piv =    information->pivot;
+    A   =    information->array;
+    thr = information->n_thread;
+
+    nums_less_than_pivot = information->n_less_than_pivot;
 
     /* 1. Encontrar los numeros que son menores o iguales al pivote */
-
+    // un for en el subarreglo del que se encarga dicho thread
+    nums_less_than_pivot = 0;
+    for (int i = lo; i <= hi; i++){
+        // Leer numeros
+        if(A[i] <= pivot){
+            nums_less_than_pivot ++;
+        }
+    }
     /* 2. Guardar la cantidad en un arreglo |S_i| */
-
+    // (hacer una variable global que se pueda hacer malloc y free)
+    
     /* 3. Guardar posiciones en prefix sum */
-
+    // Empieza de cero y se suma con el primer numero del arreglo anterior
+    
     /* 4. Posicionar los numeros encontrados segun prefix sum */
+    // No se si hacer un arreglo nuevo o ponerlo en el mismo arreglo
+    // pero el tema es que hay que saber la posicion actual y la futura
 
-        
+    /* 2, 3 y 4 se debe hacer junto con los demás threads. La idea es que según el 
+       numero de thread, que se posicione la cantidad en |S_i| */
+    /* --- de alguna forma hay que usar variables de condicion, un thread jefe y un mutex --- */        
 }
 
 int parallel_quicksort(UINT* A, int lo, int hi, pthreads_t threads[], int q_threads, int size_arr){
@@ -98,7 +116,7 @@ int parallel_quicksort(UINT* A, int lo, int hi, pthreads_t threads[], int q_thre
         int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                           (void *) parallel_partition, void *arg);
 
-        parallel_partition(A, s ize_arr * i , size_arr * (i + 1) - 1, threads[i], pivot);
+        // parallel_partition(A, s ize_arr * i , size_arr * (i + 1) - 1, threads[i], pivot);
         
     }
 
