@@ -240,8 +240,8 @@ int main(int argc, char** argv) {
             nums_copy[i] = nums[i];
         }
         
-        //printf("E1: ");
-        //print_array(nums, n);
+        printf("E1: ");
+        print_array(nums, n);
         
         struct timespec start, finish;
         double elapsed = 0;
@@ -271,8 +271,8 @@ int main(int argc, char** argv) {
         printf("\nS2: ");
         print_array(nums_copy, n);
         
-        printf("\n\nquicksort:  %lf [s]\n", elapsed);
-        printf("parallel_quicksort:  %lf [s]\n", elapsed_2);
+        //printf("\n\nquicksort:  %lf [s]\n", elapsed);
+        //printf("parallel_quicksort:  %lf [s]\n", elapsed_2);
     }
 
     free(nums_copy);
