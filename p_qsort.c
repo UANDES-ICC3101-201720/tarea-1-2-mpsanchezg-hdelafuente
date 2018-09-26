@@ -64,6 +64,10 @@ int quicksort (unsigned int* A, int lo, int hi) {
 
 typedef struct {
     UINT *array;
+    int *s_i;
+    int *l_i;
+    int *prefix_sum_s;
+    int *prefix_sum_l;
     int n;
     int pivot;
     int n_less_than_pivot;
@@ -107,12 +111,19 @@ void* parallel_partition(void *arg){
    
     k++; //numero de valores menores o iguales al pivote
 
-    /* 2. Guardar la cantidad en un arreglo |S_i| */
+    /* 2. Guardar la cantidad en un arreglo |S_i| y |L_i| */
     // (hacer una variable global que se pueda hacer malloc y free)
-    
+    S_i[current_thread] = k;
+    L_i[current_thread] = thread_part - k;
+
     /* 3. Guardar posiciones en prefix sum */
     // Empieza de cero y se suma con el primer numero del arreglo anterior
+    if(current_thread > 0){
+        prefix_sum_s[current_thread] = prefix_sum_s[current_thread - 1] + S_i[current_thread];
+        prefix_sum_l[current_thread] = prefix_sum_l[current_thread - 1] + L_i[current_thread];
+    }
     
+
     /* 4. Posicionar los numeros encontrados segun prefix sum */
     // No se si hacer un arreglo nuevo o ponerlo en el mismo arreglo
     // pero el tema es que hay que saber la posicion actual y la futura
@@ -128,10 +139,19 @@ void* parallel_partition(void *arg){
 
 int parallel_quicksort(unsigned int* A, int lo, int hi, pthread_t threads[], int q_threads, int size_arr){
     int pivot = (hi + lo) / 2;
+    int *S_i;
+    int *L_i;
+    int *prefix_sum_s, *prefix_sum_l;
     /* cuando el mutex este en 1 */
     args *info = malloc(sizeof(args));
     info->n = n;
     info->pivot = pivot;
+    info->s_i = S_i;
+    info->l_i = L_i;
+
+    prefix_sum_l = malloc(size(UINT)*n/MAXTHREADS);
+    prefix_sum_s = malloc(size(UINT)*n/MAXTHREADS);
+    
     for (int i = 0; i < MAXTHREADS; ++i) {
         pthread_mutex_lock(&lock);
         if (pthread_create(&threads[i], NULL, (void*)parallel_partition, info)) {
