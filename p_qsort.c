@@ -155,8 +155,8 @@ int parallel_quicksort(unsigned int* A, int lo, int hi, pthread_t threads[], int
     S_i = malloc(size(UINT)*n/MAXTHREADS - 1);
     L_i = malloc(size(UINT)*n/MAXTHREADS - 1);
 
-    prefix_sum_l = malloc(size(UINT)*n/MAXTHREADS - 1);
-    prefix_sum_s = malloc(size(UINT)*n/MAXTHREADS - 1);
+    prefix_sum_l = malloc(size(UINT)*n/MAXTHREADS);
+    prefix_sum_s = malloc(size(UINT)*n/MAXTHREADS);
 
     for (int i = 0; i < MAXTHREADS; ++i) {
         pthread_mutex_lock(&lock);
