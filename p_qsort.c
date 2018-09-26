@@ -122,7 +122,10 @@ void* parallel_partition(void *arg){
         prefix_sum_s[current_thread] = prefix_sum_s[current_thread - 1] + S_i[current_thread];
         prefix_sum_l[current_thread] = prefix_sum_l[current_thread - 1] + L_i[current_thread];
     }
-    
+    else{
+        prefix_sum_s[current_thread] = 0;
+        prefix_sum_l[current_thread] = 0;
+    }
 
     /* 4. Posicionar los numeros encontrados segun prefix sum */
     // No se si hacer un arreglo nuevo o ponerlo en el mismo arreglo
@@ -149,9 +152,12 @@ int parallel_quicksort(unsigned int* A, int lo, int hi, pthread_t threads[], int
     info->s_i = S_i;
     info->l_i = L_i;
 
-    prefix_sum_l = malloc(size(UINT)*n/MAXTHREADS);
-    prefix_sum_s = malloc(size(UINT)*n/MAXTHREADS);
-    
+    S_i = malloc(size(UINT)*n/MAXTHREADS - 1);
+    L_i = malloc(size(UINT)*n/MAXTHREADS - 1);
+
+    prefix_sum_l = malloc(size(UINT)*n/MAXTHREADS - 1);
+    prefix_sum_s = malloc(size(UINT)*n/MAXTHREADS - 1);
+
     for (int i = 0; i < MAXTHREADS; ++i) {
         pthread_mutex_lock(&lock);
         if (pthread_create(&threads[i], NULL, (void*)parallel_partition, info)) {
